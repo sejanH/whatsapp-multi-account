@@ -26,12 +26,13 @@ A PyQt5-based desktop application that allows you to run multiple WhatsApp Web a
 ### Prerequisites
 
 **Install system dependencies**:
-    ```bash
     # Ubuntu/Debian
-    sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebengine
-
+    ```bash
+        sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebengine
+    ```
     # Fedora/RHEL
-    sudo dnf install python3-qt5 python3-qtwebengine
+    ```bash
+        sudo dnf install python3-qt5 python3-qtwebengine
     ```
 
 **Install Python dependencies**:
