@@ -1,10 +1,10 @@
 [Desktop Entry]
-Name=WhatsApp
+Type=Application
+Name=WhatsAppClient
 GenericName=WhatsApp Multi-Account Client
 Comment=Run multiple WhatsApp Web accounts
-Exec=/home/sejan/.local/bin/WhatsAppClient
-Icon=/home/sejan/Desktop/pywebview/whatsapp_icon.png
+Exec=/home/USER/Apps/WhatsAppClient-x86_64.AppImage
+Icon=whatsapp
+Categories=Network;Chat;
 Terminal=false
-Type=Application
-Categories=Network;InstantMessaging;
 StartupWMClass=WhatsAppClient

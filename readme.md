@@ -33,3 +33,54 @@ A PyQt5-based desktop application that allows you to run multiple WhatsApp Web a
     # Fedora/RHEL
     sudo dnf install python3-qt5 python3-qtwebengine
     ```
+
+**Install Python dependencies**:
+```bash
+pip install -r requirements.txt
+```
+
+## Running
+
+```bash
+python3 main.py
+```
+
+## AppImage (Linux)
+
+1. Install build tools (PyInstaller, appimagetool).
+2. Build the AppImage:
+   ```bash
+   bash scripts/build_appimage.sh
+   ```
+
+The resulting `WhatsAppClient-x86_64.AppImage` will be created in the project root when `appimagetool` is available.
+
+## Using the AppImage
+
+1. Make it executable:
+   ```bash
+   chmod +x WhatsAppClient-x86_64.AppImage
+   ```
+2. Run it:
+   ```bash
+   ./WhatsAppClient-x86_64.AppImage
+   ```
+
+If you hit a FUSE error, run:
+
+```bash
+./WhatsAppClient-x86_64.AppImage --appimage-extract-and-run
+```
+
+## Desktop Entry (Linux)
+
+Copy the AppImage, icon, and desktop file to standard per-user locations.
+Replace `USER` in `whatsapp.desktop` with your actual username (or edit paths).
+
+```bash
+mkdir -p ~/Apps ~/.local/share/icons/hicolor/256x256/apps ~/.local/share/applications
+cp WhatsAppClient-x86_64.AppImage ~/Apps/
+cp whatsapp_icon.png ~/.local/share/icons/hicolor/256x256/apps/whatsapp.png
+cp whatsapp.desktop ~/.local/share/applications/
+chmod +x ~/Apps/WhatsAppClient-x86_64.AppImage
+```
