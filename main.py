@@ -6,8 +6,20 @@ import threading
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
-from PyQt6.QtCore import QUrl, QObject, pyqtSignal, QPropertyAnimation, QEasingCurve, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QGraphicsOpacityEffect, QMessageBox, QSplashScreen
+from PyQt6.QtCore import QUrl, QObject, pyqtSignal, QPropertyAnimation, QEasingCurve, Qt, QTimer, QEvent
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QTabWidget,
+    QGraphicsOpacityEffect,
+    QMessageBox,
+    QSplashScreen,
+    QMenu,
+    QToolButton,
+    QWidget,
+    QHBoxLayout,
+    QPushButton,
+)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from PyQt6.QtGui import QIcon, QDesktopServices, QAction, QPixmap, QPainter, QColor, QFont
@@ -17,6 +29,7 @@ GITHUB_REPO = "sejanH/whatsapp-multi-account"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 WHATSAPP_WEB_URL = "https://web.whatsapp.com"
 INACTIVE_UNLOAD_MS = 3 * 60 * 1000
+TOP_BAR_HEIGHT = 32
 
 class WhatsAppWebPage(QWebEnginePage):
     def __init__(self, profile, parent=None):
@@ -120,14 +133,23 @@ class WhatsAppAccount(QWebEngineView):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setWindowTitle("WhatsApp Multi-Account")
         self.resize(1200, 900)
+
+        self._fade_anim = None
+        self._update_checker = None
+        self._manual_update_check = False
+        self._update_check_in_progress = False
+        self._inactive_timers = {}
+        self._suspended_tabs = set()
+        self._drag_active = False
+        self._drag_offset = None
 
         # Create tabs
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.currentChanged.connect(self._on_tab_changed)
-
         # Add Account 1
         self.account1 = WhatsAppAccount("account_1")
         self.tabs.addTab(self.account1, "Personal")
@@ -136,31 +158,146 @@ class MainWindow(QMainWindow):
         self.account2 = WhatsAppAccount("account_2")
         self.tabs.addTab(self.account2, "Work / Business")
 
-        self._fade_anim = None
-        self._update_checker = None
-        self._manual_update_check = False
-        self._update_check_in_progress = False
-        self._inactive_timers = {}
-        self._suspended_tabs = set()
         self._setup_actions_menu()
+        self._setup_top_bar_controls()
         self._balance_tab_resources(self.tabs.currentIndex())
         self._schedule_inactive_unload(self.tabs.currentIndex())
         self._check_for_updates()
 
     def _setup_actions_menu(self):
-        menu = self.menuBar().addMenu("Actions")
+        self._actions_menu = QMenu(self)
 
         clear_cache = QAction("Clear Cache (Current Tab)", self)
         clear_cache.triggered.connect(self._clear_current_cache)
-        menu.addAction(clear_cache)
+        self._actions_menu.addAction(clear_cache)
 
         open_downloads = QAction("Open Downloads Folder", self)
         open_downloads.triggered.connect(self._open_downloads)
-        menu.addAction(open_downloads)
+        self._actions_menu.addAction(open_downloads)
 
         check_updates = QAction("Check for Updates", self)
         check_updates.triggered.connect(lambda: self._check_for_updates(manual=True))
-        menu.addAction(check_updates)
+        self._actions_menu.addAction(check_updates)
+
+    def _setup_top_bar_controls(self):
+        self.tabs.setDocumentMode(True)
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().installEventFilter(self)
+        tab_height = TOP_BAR_HEIGHT
+
+        self._corner_controls = QWidget(self.tabs)
+        layout = QHBoxLayout(self._corner_controls)
+        layout.setContentsMargins(6, 0, 6, 0)
+        layout.setSpacing(6)
+        self._corner_controls.installEventFilter(self)
+        self._corner_controls.setFixedHeight(tab_height)
+
+        layout.addStretch()
+
+        settings_btn = QToolButton(self._corner_controls)
+        settings_btn.setText("⚙")
+        settings_btn.setToolTip("Actions")
+        settings_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        settings_btn.setMenu(self._actions_menu)
+        settings_btn.setFixedSize(32, 31)
+        settings_btn.setObjectName("title_control")
+        layout.addWidget(settings_btn)
+
+        min_btn = QPushButton("−", self._corner_controls)
+        min_btn.setToolTip("Minimize")
+        min_btn.setFixedSize(32, 31)
+        min_btn.setObjectName("title_control")
+        min_btn.clicked.connect(self.showMinimized)
+        layout.addWidget(min_btn)
+
+        self._max_btn = QPushButton("□", self._corner_controls)
+        self._max_btn.setToolTip("Maximize")
+        self._max_btn.setFixedSize(32, 31)
+        self._max_btn.setObjectName("title_control")
+        self._max_btn.clicked.connect(self._toggle_maximize)
+        layout.addWidget(self._max_btn)
+
+        close_btn = QPushButton("×", self._corner_controls)
+        close_btn.setToolTip("Close")
+        close_btn.setFixedSize(32, 31)
+        close_btn.setObjectName("title_control")
+        close_btn.clicked.connect(self.close)
+        layout.addWidget(close_btn)
+
+        self.tabs.setCornerWidget(self._corner_controls, Qt.Corner.TopRightCorner)
+        self.tabs.setStyleSheet(
+            """
+            QTabWidget::pane { border: none; }
+            QTabBar::tab { min-height: 30px; max-height: 30px; padding: 1px 12px; }
+            """
+        )
+        self._corner_controls.setStyleSheet(
+            """
+            QToolButton, QPushButton {
+                border: 1px solid #3a3f46;
+                border-radius: 4px;
+                background: #2b2f36;
+                color: #e8eaed;
+                font-weight: 600;
+                font-size:16px;
+            }
+            QToolButton:hover, QPushButton:hover { background: #363b44; }
+            """
+        )
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+            self._max_btn.setText("□")
+            self._max_btn.setToolTip("Maximize")
+            return
+        self.showMaximized()
+        self._max_btn.setText("❐")
+        self._max_btn.setToolTip("Restore")
+
+    def eventFilter(self, obj, event):
+        draggable_sources = {
+            self.tabs.tabBar(),
+            getattr(self, "_corner_controls", None),
+        }
+        if obj in draggable_sources:
+            child = None
+            if hasattr(event, "position"):
+                child = obj.childAt(event.position().toPoint())
+
+            if event.type() == QEvent.Type.MouseButtonDblClick and event.button() == Qt.MouseButton.LeftButton:
+                if child and child.objectName() == "title_control":
+                    return super().eventFilter(obj, event)
+                self._toggle_maximize()
+                return True
+
+            if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+                if child and child.objectName() == "title_control":
+                    return super().eventFilter(obj, event)
+
+                # Prefer native WM drag so behavior matches standard title bars.
+                handle = self.windowHandle()
+                if handle is not None and handle.startSystemMove():
+                    self._drag_active = False
+                    self._drag_offset = None
+                    return True
+
+                self._drag_active = True
+                self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                return True
+
+            if event.type() == QEvent.Type.MouseMove and self._drag_active and self._drag_offset is not None:
+                if not self.isMaximized():
+                    self.move(event.globalPosition().toPoint() - self._drag_offset)
+                return True
+
+            if event.type() == QEvent.Type.MouseButtonRelease:
+                self._drag_active = False
+                self._drag_offset = None
+                return True
+
+        return super().eventFilter(obj, event)
 
     def _current_account(self):
         widget = self.tabs.currentWidget()
