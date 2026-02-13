@@ -21,6 +21,7 @@ mkdir -p "${APP_DIR}/usr/share/icons/hicolor/256x256/apps"
 
 cp "${ROOT_DIR}/dist/${APP_NAME}" "${APP_DIR}/usr/bin/${APP_NAME}"
 cp "${ICON_SRC}" "${APP_DIR}/usr/share/icons/hicolor/256x256/apps/whatsapp.png"
+cp "${ICON_SRC}" "${APP_DIR}/whatsapp.png"
 cp "${ROOT_DIR}/packaging/AppRun" "${APP_DIR}/AppRun"
 cp "${ROOT_DIR}/packaging/WhatsAppClient.desktop" "${APP_DIR}/WhatsAppClient.desktop"
 
