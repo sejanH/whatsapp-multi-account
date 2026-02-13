@@ -12,7 +12,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from PyQt6.QtGui import QIcon, QDesktopServices, QAction, QPixmap, QPainter, QColor, QFont
 
-APP_VERSION = "0.0.3"
+APP_VERSION = "1.0.0"
 GITHUB_REPO = "sejanH/whatsapp-multi-account"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 WHATSAPP_WEB_URL = "https://web.whatsapp.com"
