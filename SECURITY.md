@@ -9,7 +9,7 @@
 
 If you discover a security vulnerability (e.g., credential leakage, session hijacking, or RCE), please report it privately. You can report vulnerabilities via one of the following:
 
-1. **Email:** Send a detailed report to `your-email@example.com` (replace this with your actual email).
+1. **Email:** Send a detailed report to `sejan@sejan.xyz` .
 2. **GitHub Security Advisory:** If enabled, please use the [Draft a new Security Advisory](https://github.com/sejanH/whatsapp-multi-account/security/advisories/new) feature on GitHub.
 
 ### What to include in your report:
