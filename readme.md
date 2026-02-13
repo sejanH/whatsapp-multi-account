@@ -1,6 +1,6 @@
 # WhatsApp Multi-Account Client
 
-A PyQt5-based desktop application that allows you to run multiple WhatsApp Web accounts simultaneously in a single window using tabs. Each account maintains its own separate profile and storage, enabling you to use personal and business accounts simultaneously.
+A PyQt6-based desktop application that allows you to run multiple WhatsApp Web accounts simultaneously in a single window using tabs. Each account maintains its own separate profile and storage, enabling you to use personal and business accounts simultaneously.
 
 ## Features
 
@@ -13,8 +13,8 @@ A PyQt5-based desktop application that allows you to run multiple WhatsApp Web a
 ## Requirements
 
 - Python 3.6 or higher
-- PyQt5
-- PyQtWebEngine
+- PyQt6
+- PyQt6-WebEngine
 - PyInstaller (for building the executable)
 
 ## Required Python Scripts
@@ -28,11 +28,11 @@ A PyQt5-based desktop application that allows you to run multiple WhatsApp Web a
 **Install system dependencies**:
 ```bash
 # Ubuntu/Debian
-sudo apt-get install python3-pyqt5 python3-pyqt5.qtwebengine
+sudo apt-get install python3-pyqt6 python3-pyqt6.qtwebengine
 ```
 ```bash
 # Fedora/RHEL
-sudo dnf install python3-qt5 python3-qtwebengine
+sudo dnf install python3-qt6 python3-qt6-webengine
 ```
 
 **Install Python dependencies**:
@@ -55,6 +55,21 @@ python3 main.py
    ```
 
 The resulting `WhatsAppClient-x86_64.AppImage` will be created in the project root when `appimagetool` is available.
+
+## macOS (.app)
+
+1. Create a virtual environment and install dependencies:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. Build the app bundle:
+   ```bash
+   bash scripts/build_mac.sh
+   ```
+
+The resulting `WhatsAppClient.app` will be created in `dist/`.
 
 ## Using the AppImage
 
