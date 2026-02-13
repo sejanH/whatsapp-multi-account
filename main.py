@@ -30,6 +30,7 @@ GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 WHATSAPP_WEB_URL = "https://web.whatsapp.com"
 INACTIVE_UNLOAD_MS = 3 * 60 * 1000
 TOP_BAR_HEIGHT = 32
+ENABLE_LIFECYCLE_FREEZE = False
 
 class WhatsAppWebPage(QWebEnginePage):
     def __init__(self, profile, parent=None):
@@ -185,11 +186,14 @@ class MainWindow(QMainWindow):
         self.tabs.tabBar().setExpanding(False)
         self.tabs.tabBar().installEventFilter(self)
         tab_height = TOP_BAR_HEIGHT
+        button_height = tab_height
+        self.tabs.tabBar().setFixedHeight(tab_height)
 
         self._corner_controls = QWidget(self.tabs)
+        self._corner_controls.setObjectName("corner_controls")
         layout = QHBoxLayout(self._corner_controls)
-        layout.setContentsMargins(6, 0, 6, 0)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         self._corner_controls.installEventFilter(self)
         self._corner_controls.setFixedHeight(tab_height)
 
@@ -200,49 +204,78 @@ class MainWindow(QMainWindow):
         settings_btn.setToolTip("Actions")
         settings_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         settings_btn.setMenu(self._actions_menu)
-        settings_btn.setFixedSize(32, 31)
+        settings_btn.setFixedSize(32, button_height)
         settings_btn.setObjectName("title_control")
         layout.addWidget(settings_btn)
 
         min_btn = QPushButton("−", self._corner_controls)
         min_btn.setToolTip("Minimize")
-        min_btn.setFixedSize(32, 31)
+        min_btn.setFixedSize(32, button_height)
+        min_btn.setAutoDefault(False)
+        min_btn.setDefault(False)
         min_btn.setObjectName("title_control")
         min_btn.clicked.connect(self.showMinimized)
         layout.addWidget(min_btn)
 
         self._max_btn = QPushButton("□", self._corner_controls)
         self._max_btn.setToolTip("Maximize")
-        self._max_btn.setFixedSize(32, 31)
+        self._max_btn.setFixedSize(32, button_height)
+        self._max_btn.setAutoDefault(False)
+        self._max_btn.setDefault(False)
         self._max_btn.setObjectName("title_control")
         self._max_btn.clicked.connect(self._toggle_maximize)
         layout.addWidget(self._max_btn)
 
         close_btn = QPushButton("×", self._corner_controls)
         close_btn.setToolTip("Close")
-        close_btn.setFixedSize(32, 31)
+        close_btn.setFixedSize(32, button_height)
+        close_btn.setAutoDefault(False)
+        close_btn.setDefault(False)
         close_btn.setObjectName("title_control")
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
 
         self.tabs.setCornerWidget(self._corner_controls, Qt.Corner.TopRightCorner)
+        self.tabs.tabBar().setDrawBase(False)
         self.tabs.setStyleSheet(
-            """
-            QTabWidget::pane { border: none; }
-            QTabBar::tab { min-height: 30px; max-height: 30px; padding: 1px 12px; }
+            f"""
+            QTabWidget::pane {{ border: none; }}
+            QTabBar::tab {{
+                min-height: {tab_height}px;
+                max-height: {tab_height}px;
+                padding: 0px 12px;
+                background: #2b2f36;
+                color: #c0c5cc;
+                border: none;
+            }}
+            QTabBar::tab:selected {{
+                background: #1f6feb;
+                color: #ffffff;
+            }}
+            QTabBar::tab:hover:!selected {{
+                background: #363b44;
+                color: #ffffff;
+            }}
             """
         )
         self._corner_controls.setStyleSheet(
             """
-            QToolButton, QPushButton {
-                border: 1px solid #3a3f46;
-                border-radius: 4px;
-                background: #2b2f36;
-                color: #e8eaed;
-                font-weight: 600;
-                font-size:16px;
+            QWidget#corner_controls {
+                border: none;
+                background: transparent;
             }
-            QToolButton:hover, QPushButton:hover { background: #363b44; }
+            QToolButton, QPushButton {
+                border: none;
+                padding: 0px;
+                border-radius: 0px;
+                color: #c0c5cc;
+                font-weight: 600;
+                font-size:15px;
+                outline: none;
+            }
+            QToolButton:hover, QPushButton:hover { background: #363b44; color: #ffffff; }
+            QToolButton:pressed, QPushButton:pressed { background: #1f6feb; color: #ffffff; }
+            QToolButton::menu-indicator { image: none; width: 0px; }
             """
         )
 
@@ -257,22 +290,31 @@ class MainWindow(QMainWindow):
         self._max_btn.setToolTip("Restore")
 
     def eventFilter(self, obj, event):
+        tab_bar = self.tabs.tabBar()
         draggable_sources = {
-            self.tabs.tabBar(),
+            tab_bar,
             getattr(self, "_corner_controls", None),
         }
         if obj in draggable_sources:
             child = None
+            clicked_on_tab = False
             if hasattr(event, "position"):
-                child = obj.childAt(event.position().toPoint())
+                pos = event.position().toPoint()
+                child = obj.childAt(pos)
+                if obj is tab_bar and tab_bar.tabAt(pos) >= 0:
+                    clicked_on_tab = True
 
             if event.type() == QEvent.Type.MouseButtonDblClick and event.button() == Qt.MouseButton.LeftButton:
+                if clicked_on_tab:
+                    return super().eventFilter(obj, event)
                 if child and child.objectName() == "title_control":
                     return super().eventFilter(obj, event)
                 self._toggle_maximize()
                 return True
 
             if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+                if clicked_on_tab:
+                    return super().eventFilter(obj, event)
                 if child and child.objectName() == "title_control":
                     return super().eventFilter(obj, event)
 
@@ -293,6 +335,8 @@ class MainWindow(QMainWindow):
                 return True
 
             if event.type() == QEvent.Type.MouseButtonRelease:
+                if not self._drag_active:
+                    return super().eventFilter(obj, event)
                 self._drag_active = False
                 self._drag_offset = None
                 return True
@@ -381,6 +425,9 @@ class MainWindow(QMainWindow):
         widget.setUrl(QUrl(WHATSAPP_WEB_URL))
 
     def _balance_tab_resources(self, active_index):
+        if not ENABLE_LIFECYCLE_FREEZE:
+            return
+
         lifecycle_enum = getattr(QWebEnginePage, "LifecycleState", None)
         if lifecycle_enum is None:
             return
