@@ -5,15 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="WhatsAppClient"
 APP_DIR="${ROOT_DIR}/AppDir"
 ICON_SRC="${ROOT_DIR}/whatsapp_icon.png"
+SPEC_FILE="${ROOT_DIR}/WhatsAppClient.spec"
 
 mkdir -p "${ROOT_DIR}/dist"
 
-pyinstaller \
-  --name "${APP_NAME}" \
-  --onefile \
-  --windowed \
-  --icon "${ICON_SRC}" \
-  "${ROOT_DIR}/main.py"
+pyinstaller --clean "${SPEC_FILE}"
 
 rm -rf "${APP_DIR}"
 mkdir -p "${APP_DIR}/usr/bin"

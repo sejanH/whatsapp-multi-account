@@ -6,12 +6,11 @@ import threading
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
-from PyQt6.QtCore import QUrl, QObject, pyqtSignal, QPropertyAnimation, QEasingCurve, Qt, QTimer, QEvent
+from PyQt6.QtCore import QUrl, QObject, pyqtSignal, Qt, QTimer, QEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
     QTabWidget,
-    QGraphicsOpacityEffect,
     QMessageBox,
     QSplashScreen,
     QMenu,
@@ -138,7 +137,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("WhatsApp Multi-Account")
         self.resize(1200, 900)
 
-        self._fade_anim = None
         self._update_checker = None
         self._manual_update_check = False
         self._update_check_in_progress = False
@@ -363,25 +361,13 @@ class MainWindow(QMainWindow):
             downloads_path = os.path.expanduser("~")
         QDesktopServices.openUrl(QUrl.fromLocalFile(downloads_path))
 
-    def _animate_tab_fade(self, index):
-        widget = self.tabs.widget(index)
-        if widget is None:
-            return
-        effect = QGraphicsOpacityEffect(widget)
-        widget.setGraphicsEffect(effect)
-        animation = QPropertyAnimation(effect, b"opacity", self)
-        animation.setDuration(180)
-        animation.setStartValue(0.0)
-        animation.setEndValue(1.0)
-        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._fade_anim = animation
-        animation.start()
-
     def _on_tab_changed(self, index):
         self._resume_tab_if_suspended(index)
         self._schedule_inactive_unload(index)
-        self._animate_tab_fade(index)
         self._balance_tab_resources(index)
+        widget = self.tabs.widget(index)
+        if isinstance(widget, WhatsAppAccount):
+            widget.setFocus(Qt.FocusReason.TabFocusReason)
 
     def _schedule_inactive_unload(self, active_index):
         for i in range(self.tabs.count()):
