@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QTabWidget,
     QMessageBox,
-    QSplashScreen,
     QMenu,
     QToolButton,
     QWidget,
@@ -22,9 +21,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
-from PyQt6.QtGui import QIcon, QDesktopServices, QAction, QPixmap, QPainter, QColor, QFont
+from PyQt6.QtGui import QIcon, QDesktopServices, QAction
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 GITHUB_REPO = "sejanH/whatsapp-multi-account"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 WHATSAPP_WEB_URL = "https://web.whatsapp.com"
@@ -34,6 +33,8 @@ ENABLE_LIFECYCLE_FREEZE = False
 
 
 class WhatsAppWebPage(QWebEnginePage):
+    external_url_requested = pyqtSignal(QUrl)
+
     def __init__(self, profile, parent=None):
         super().__init__(profile, parent)
         # List of WhatsApp domains allowed in-app
@@ -71,6 +72,22 @@ class WhatsAppWebPage(QWebEnginePage):
     def _is_internal_scheme(self, url):
         scheme = url.scheme().lower()
         return scheme in {"about", "blob", "data"}
+
+    def createWindow(self, _type):
+        page = QWebEnginePage(self.profile(), self)
+        page.urlChanged.connect(lambda url, p=page: self._handle_new_window_url(p, url))
+        return page
+
+    def _handle_new_window_url(self, page, url):
+        if self._is_internal_scheme(url):
+            return
+        if not self._is_whatsapp_domain(url):
+            self.external_url_requested.emit(url)
+            page.deleteLater()
+            return
+        # If WhatsApp tries to open a new window, keep it in the same view.
+        self.setUrl(url)
+        page.deleteLater()
 
 def _version_tuple(value):
     match = re.findall(r"\d+", value)
@@ -121,6 +138,7 @@ class WhatsAppAccount(QWebEngineView):
         self.profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies)
         self.profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
         self.profile.setHttpCacheMaximumSize(64 * 1024 * 1024)
+        self.profile.downloadRequested.connect(self._on_download_requested)
         
         # Set User-Agent to modern Chrome
         user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
@@ -128,9 +146,22 @@ class WhatsAppAccount(QWebEngineView):
 
         # 2. Assign the profile to the page
         page = WhatsAppWebPage(self.profile, self)
+        page.external_url_requested.connect(self._open_external_url)
         self.setPage(page)
         
         self.setUrl(QUrl(WHATSAPP_WEB_URL))
+
+    def _open_external_url(self, url):
+        QDesktopServices.openUrl(url)
+
+    def _on_download_requested(self, download):
+        downloads_path = os.path.expanduser("~/Downloads/WhatsApp")
+        os.makedirs(downloads_path, exist_ok=True)
+
+        filename = download.downloadFileName() or "whatsapp-download"
+        download.setDownloadDirectory(downloads_path)
+        download.setDownloadFileName(filename)
+        download.accept()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -358,7 +389,9 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Cache Cleared", "Cleared cache and cookies for current tab.")
 
     def _open_downloads(self):
-        downloads_path = os.path.expanduser("~/Downloads")
+        downloads_path = os.path.expanduser("~/Downloads/WhatsApp")
+        if not os.path.isdir(downloads_path):
+            downloads_path = os.path.expanduser("~/Downloads")
         if not os.path.isdir(downloads_path):
             downloads_path = os.path.expanduser("~")
         QDesktopServices.openUrl(QUrl.fromLocalFile(downloads_path))
@@ -451,18 +484,21 @@ class MainWindow(QMainWindow):
 
     def _on_update_available(self, latest_tag):
         self._update_check_in_progress = False
-        reply = QMessageBox.question(
-            self,
-            "Update Available",
+        releases_url = f"https://github.com/{GITHUB_REPO}/releases"
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Update Available")
+        msg.setText(
             (
                 f"A new version is available: {latest_tag}\n"
                 f"Current version: {APP_VERSION}\n\n"
                 "Open releases page?"
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
         )
-        if reply == QMessageBox.StandardButton.Yes:
-            QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}/releases"))
+        open_btn = msg.addButton("Open releases page", QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton("Close", QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+        if msg.clickedButton() is open_btn:
+            QDesktopServices.openUrl(QUrl(releases_url))
 
     def _on_no_update_available(self):
         self._update_check_in_progress = False
@@ -475,59 +511,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Update Check Failed", "Could not check for updates right now.")
 
 
-def _create_splash_screen():
-    pixmap = QPixmap(520, 280)
-    pixmap.fill(QColor("#11161c"))
-
-    icon_path = os.path.join(os.path.dirname(__file__), "whatsapp_icon.png")
-    icon_pixmap = QPixmap(icon_path)
-
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.fillRect(20, 20, 480, 240, QColor("#202833"))
-
-    if not icon_pixmap.isNull():
-        scaled_icon = icon_pixmap.scaled(
-            64,
-            64,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        painter.drawPixmap(40, 55, scaled_icon)
-
-    painter.setPen(QColor("#ffffff"))
-    painter.setFont(QFont("Sans Serif", 18, QFont.Weight.Bold))
-    painter.drawText(120, 95, "WhatsApp Multi-Account")
-
-    painter.setPen(QColor("#c7d0db"))
-    painter.setFont(QFont("Sans Serif", 11))
-    painter.drawText(120, 130, f"Starting v{APP_VERSION}...")
-    painter.end()
-
-    splash = QSplashScreen(pixmap)
-    splash.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-    return splash
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    splash = _create_splash_screen()
-    splash.show()
-    app.processEvents()
-
     window = MainWindow()
     window.show()
-
-    splash_closed = {"done": False}
-
-    def close_splash():
-        if splash_closed["done"]:
-            return
-        splash_closed["done"] = True
-        splash.finish(window)
-
-    # Keep splash visible until first account finishes initial load.
-    window.account1.loadFinished.connect(lambda _ok: close_splash())
-    # Fallback timeout so splash is not stuck forever on bad network.
-    QTimer.singleShot(12000, close_splash)
 
     sys.exit(app.exec())
