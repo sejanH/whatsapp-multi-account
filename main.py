@@ -1,5 +1,6 @@
 import sys
 import os
+import platform
 import json
 import re
 import threading
@@ -142,6 +143,8 @@ class WhatsAppAccount(QWebEngineView):
         
         # Set User-Agent to modern Chrome
         user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        if platform.system() == "Darwin":
+            user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
         self.profile.setHttpUserAgent(user_agent)
 
         # 2. Assign the profile to the page
